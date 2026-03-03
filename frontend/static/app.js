@@ -45,32 +45,55 @@ async function addServer() {
     const name = document.getElementById('server-name').value.trim();
     const host = document.getElementById('server-host').value.trim();
     const port = parseInt(document.getElementById('server-port').value);
-
+ 
     if (!name || !host || !port) {
         alert('Por favor, completa todos los campos');
         return;
     }
-
-    const server = {
-        id: 'server_' + Date.now(),
-        name: name,
-        host: host,
-        port: port
-    };
-
-    servers.push(server);
-    renderServers();
-    updateServerSelect();
-
-    document.getElementById('server-name').value = '';
-    document.getElementById('server-host').value = '';
-    document.getElementById('server-port').value = '';
+ 
+    try {
+        const response = await fetch('/api/servers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, host, port })
+        });
+        
+        if (response.ok) {
+            const server = await response.json();
+            await loadServers();
+ 
+            document.getElementById('server-name').value = '';
+            document.getElementById('server-host').value = '';
+            document.getElementById('server-port').value = '';
+        } else {
+            const error = await response.json();
+            alert('Error al añadir servidor: ' + (error.error || 'Desconocido'));
+        }
+    } catch (error) {
+        console.error('Error adding server:', error);
+        alert('Error al añadir servidor. Revisa la consola para detalles.');
+    }
 }
 
-function removeServer(serverId) {
-    servers = servers.filter(s => s.id !== serverId);
-    renderServers();
-    updateServerSelect();
+async function removeServer(serverId) {
+    if (!confirm('¿Estás seguro de eliminar este servidor?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/servers/${serverId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            await loadServers();
+        } else {
+            alert('Error al eliminar servidor');
+        }
+    } catch (error) {
+        console.error('Error removing server:', error);
+        alert('Error al eliminar servidor. Revisa la consola para detalles.');
+    }
 }
 
 async function connect() {

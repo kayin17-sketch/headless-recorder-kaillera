@@ -5,7 +5,7 @@ import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import asyncio
 from pathlib import Path
 
@@ -21,9 +21,65 @@ from protocol.kaillera_client import KailleraClient
 from recorder.recorder import KailleraRecorder
 
 
+class ServerManager:
+    def __init__(self, servers_file: str):
+        self.servers_file = servers_file
+        self.servers: List[Dict] = []
+        self._lock = threading.Lock()
+        self._load_servers()
+    
+    def _load_servers(self):
+        if not os.path.exists(self.servers_file):
+            self.servers = []
+            return
+        
+        try:
+            with open(self.servers_file, 'r', encoding='utf-8') as f:
+                self.servers = json.load(f)
+        except Exception as e:
+            print(f"Error loading servers: {e}")
+            self.servers = []
+    
+    def _save_servers(self):
+        try:
+            with open(self.servers_file, 'w', encoding='utf-8') as f:
+                json.dump(self.servers, f, indent=2)
+        except Exception as e:
+            print(f"Error saving servers: {e}")
+    
+    def get_servers(self) -> List[Dict]:
+        with self._lock:
+            return self.servers.copy()
+    
+    def add_server(self, name: str, host: str, port: int) -> Dict:
+        server = {
+            'id': f'server_{int(time.time() * 1000)}',
+            'name': name,
+            'host': host,
+            'port': port
+        }
+        
+        with self._lock:
+            self.servers.append(server)
+            self._save_servers()
+        
+        return server
+    
+    def delete_server(self, server_id: str) -> bool:
+        with self._lock:
+            initial_count = len(self.servers)
+            self.servers = [s for s in self.servers if s['id'] != server_id]
+            deleted = len(self.servers) < initial_count
+            if deleted:
+                self._save_servers()
+        
+        return deleted
+
+
 class KailleraAPIHandler(BaseHTTPRequestHandler):
     instances: Dict[str, 'KailleraInstance'] = {}
     recorder = KailleraRecorder(os.path.join(PROJECT_ROOT, "recordings"))
+    server_manager = ServerManager(os.path.join(PROJECT_ROOT, "backend", "servers.json"))
     
     def log_message(self, format, *args):
         print(f"[{self.log_date_time_string()}] {format % args}")
@@ -77,6 +133,22 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
             self.handle_stop_recording(data)
         elif parsed_path.path == '/api/delete-recording':
             self.handle_delete_recording(data)
+        elif parsed_path.path == '/api/servers':
+            self.handle_add_server(data)
+        else:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b'Not Found')
+    
+    def do_DELETE(self):
+        parsed_path = urlparse(self.path)
+        self.log_message("DELETE %s", parsed_path.path)
+        
+        # Extract server_id from path: /api/servers/{id}
+        parts = parsed_path.path.split('/')
+        if len(parts) == 4 and parts[1] == 'api' and parts[2] == 'servers':
+            server_id = parts[3]
+            self.handle_delete_server(server_id)
         else:
             self.send_response(404)
             self.end_headers()
@@ -113,16 +185,47 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         
-        servers = [
-            {
-                'id': 'server1',
-                'name': 'Test Server',
-                'host': '127.0.0.1',
-                'port': 27888
-            }
-        ]
-        
+        servers = self.server_manager.get_servers()
         self.wfile.write(json.dumps(servers).encode())
+    
+    def handle_add_server(self, data: dict):
+        name = data.get('name')
+        host = data.get('host')
+        port = data.get('port')
+        
+        if not all([name, host, port]):
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': 'Missing required fields: name, host, port'}).encode())
+            return
+        
+        try:
+            port = int(port)
+        except (ValueError, TypeError):
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': 'Port must be a number'}).encode())
+            return
+        
+        server = self.server_manager.add_server(name, host, port)
+        
+        self.send_response(201)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(server).encode())
+    
+    def handle_delete_server(self, server_id: str):
+        success = self.server_manager.delete_server(server_id)
+        
+        if success:
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'success': True}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': 'Server not found'}).encode())
     
     def handle_list_instances(self):
         self.send_response(200)
@@ -174,7 +277,7 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         client.on_status_update = on_status_update
         client.on_game_data = on_game_data
         
-        # Run connection synchronously in the handler
+        # Run connection synchronously in handler
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -368,6 +471,7 @@ def run_server(host: str = '0.0.0.0', port: int = 8000):
     print(f"CURRENT_FILE: {CURRENT_FILE}")
     print(f"PROJECT_ROOT: {PROJECT_ROOT}")
     print(f"Frontend path: {os.path.join(PROJECT_ROOT, 'frontend/templates/index.html')}")
+    print(f"Servers file: {os.path.join(PROJECT_ROOT, 'backend/servers.json')}")
     server = HTTPServer((host, port), KailleraAPIHandler)
     print(f"Server running on http://{host}:{port}")
     server.serve_forever()
