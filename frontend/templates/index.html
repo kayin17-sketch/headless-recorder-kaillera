@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaillera Headless Recorder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Kaillera Headless Recorder</h1>
+            <p>Grabador de partidas Kaillera sin interfaz gráfica</p>
+        </header>
+
+        <div class="main-content">
+            <section class="servers-section">
+                <h2>Servidores Configurados</h2>
+                <div id="servers-list" class="servers-list"></div>
+                <div class="add-server">
+                    <input type="text" id="server-name" placeholder="Nombre del servidor">
+                    <input type="text" id="server-host" placeholder="Host (ej: 127.0.0.1)">
+                    <input type="number" id="server-port" placeholder="Puerto (ej: 27888)">
+                    <button onclick="addServer()">Añadir Servidor</button>
+                </div>
+            </section>
+
+            <section class="connection-section">
+                <h2>Conexión</h2>
+                <div class="connection-controls">
+                    <select id="server-select"></select>
+                    <button onclick="connect()" id="connect-btn">Conectar</button>
+                    <button onclick="disconnect()" id="disconnect-btn" disabled>Desconectar</button>
+                </div>
+                <div id="connection-status" class="status"></div>
+            </section>
+
+            <section class="games-section">
+                <h2>Partidas Disponibles</h2>
+                <div id="games-list" class="games-list"></div>
+                <div class="game-controls">
+                    <button onclick="joinGame()" id="join-btn" disabled>Unirse a Partida</button>
+                    <button onclick="leaveGame()" id="leave-btn" disabled>Salir de Partida</button>
+                    <button onclick="startGame()" id="start-btn" disabled>Iniciar Partida</button>
+                </div>
+            </section>
+
+            <section class="recording-section">
+                <h2>Grabación</h2>
+                <div class="recording-controls">
+                    <button onclick="startRecording()" id="record-btn" disabled>Iniciar Grabación</button>
+                    <button onclick="stopRecording()" id="stop-btn" disabled>Detener Grabación</button>
+                </div>
+                <div id="recording-status" class="status"></div>
+            </section>
+
+            <section class="recordings-section">
+                <h2>Grabaciones Guardadas</h2>
+                <div id="recordings-list" class="recordings-list"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

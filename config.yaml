@@ -1,0 +1,28 @@
+# Ejemplo de configuración de servidores Kaillera
+
+servidores:
+  - id: "server1"
+    name: "Servidor Local"
+    host: "127.0.0.1"
+    port: 27888
+  
+  - id: "server2"
+    name: "Servidor de Pruebas"
+    host: "192.168.1.100"
+    port: 27888
+  
+  # Ejemplo de servidor público
+  # - id: "public_server"
+  #   name: "Servidor Público"
+  #   host: "kaillera.example.com"
+  #   port: 27888
+
+grabaciones:
+  directorio: "recordings"
+  formato: "both"  # Opciones: json, kr, both
+  auto_guardar: true
+
+cliente:
+  nombre: "HeadlessRecorder"
+  emulador: "HeadlessRecorder"
+  tipo_conexion: 3  # 1=LAN, 2=Excelente, 3=Good, 4=Average, 5=Low, 6=Bad
