@@ -256,7 +256,10 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         host = data.get('host', '127.0.0.1')
         port = data.get('port', 27888)
         
+        print(f"Connecting to {host}:{port}...")
+        
         if instance_id in self.instances:
+            print(f"Disconnecting existing instance {instance_id}")
             self.instances[instance_id].client.disconnect()
         
         client = KailleraClient()
@@ -264,6 +267,7 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         self.instances[instance_id] = instance
         
         def on_status_update(status):
+            print(f"Status update: {status.users} users, {status.games} games")
             instance.update_status(status)
         
         def on_game_data(game_data):
@@ -279,14 +283,19 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         
         # Run connection synchronously in handler
         try:
+            print(f"Starting async connection...")
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             success = loop.run_until_complete(client.connect(host, port))
+            print(f"Connection completed. Success: {success}")
             if success:
+                print(f"Getting server status...")
                 loop.run_until_complete(client.update_status(host))
             loop.close()
         except Exception as e:
+            import traceback
             print(f"Connection error: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
             success = False
         
         result = {
@@ -295,6 +304,7 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
             'game_port': client.game_port
         }
         
+        print(f"Sending response: {result}")
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
