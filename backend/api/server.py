@@ -10,7 +10,11 @@ import asyncio
 from pathlib import Path
 
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Get the absolute path of this file
+CURRENT_FILE = os.path.abspath(__file__)
+# Go up 3 levels: backend/api/server.py -> backend/api -> backend -> project_root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_FILE)))
+# Add project root to path
 sys.path.insert(0, PROJECT_ROOT)
 
 from protocol.kaillera_client import KailleraClient
@@ -384,7 +388,9 @@ class KailleraInstance:
 
 
 def run_server(host: str = '0.0.0.0', port: int = 8000):
+    print(f"CURRENT_FILE: {CURRENT_FILE}")
     print(f"PROJECT_ROOT: {PROJECT_ROOT}")
+    print(f"Frontend path: {os.path.join(PROJECT_ROOT, 'frontend/templates/index.html')}")
     server = HTTPServer((host, port), KailleraAPIHandler)
     print(f"Server running on http://{host}:{port}")
     server.serve_forever()
