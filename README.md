@@ -84,6 +84,64 @@ cd backend
 python main.py
 ```
 
+### Configurar Servidor Local
+
+El servidor está configurado para conectarse a **192.168.178.55:27888**.
+
+Para cambiar la configuración, añade el servidor desde la interfaz web:
+1. Abre `http://localhost:8000`
+2. En "Servidores Configurados":
+   - Nombre: `Servidor Local`
+   - Host: `192.168.178.55`
+   - Puerto: `27888`
+3. Haz clic en "Añadir Servidor"
+
+### Prueba de Conexión Local
+
+Para verificar que el servidor es accesible, ejecuta:
+
+```cmd
+test_local.bat
+```
+
+Esta herramienta probará:
+- ✅ Conectividad UDP al puerto 27888
+- ✅ Respuesta del servidor Kaillera
+- ✅ Handshake HELLO/HELLOD00D
+- ✅ Diagnóstico detallado de problemas
+
+**Resultados esperados:**
+
+Si funciona:
+```
+============================================================
+Testing Kaillera Server
+============================================================
+Server: 192.168.178.55:27888
+Timeout: 10s
+
+[1] Creating UDP socket...
+    ✓ Socket created
+[2] Sending HELLO message to 192.168.178.55:27888...
+    ✓ Sent: b'HELLO0.83'
+[3] Waiting for response (timeout: 10s)...
+    ✓ Received 13 bytes
+    ✓ From: 192.168.178.55:27888
+[4] Parsing response...
+    Raw response: HELLOD00D7159
+    ✓ HELLOD00D detected
+    ✓ New game port: 7159
+
+============================================================
+✓ TEST PASSED - Server is running Kaillera 0.83
+✓ Connection to 7159 port required for game data
+============================================================
+
+✓ SUCCESS - Server is accessible!
+  The headless recorder should be able to connect.
+  Update server configuration to use 192.168.178.55:27888
+```
+
 El servidor se iniciará en `http://localhost:8000`
 
 ### Usar la Interfaz Web
