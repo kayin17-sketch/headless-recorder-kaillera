@@ -26,52 +26,92 @@ class KailleraClient:
     
     async def connect(self, host: str, port: int = 27888) -> bool:
         try:
+            print(f"  [Client] Creating UDP socket...")
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.socket.settimeout(5.0)
+            print(f"  [Client] Socket created successfully")
             
+            print(f"  [Client] Creating HELLO message...")
             hello = self.protocol.create_hello_message()
+            print(f"  [Client] HELLO message: {hello[:20]}...")
+            
+            print(f"  [Client] Sending HELLO to {host}:{port}...")
             self.socket.sendto(hello, (host, port))
+            print(f"  [Client] HELLO sent, waiting for response...")
             
             data, _ = self.socket.recvfrom(1024)
+            print(f"  [Client] Received {len(data)} bytes")
+            print(f"  [Client] Response: {data[:50]}...")
+            
+            print(f"  [Client] Parsing HELLO response...")
             success, new_port = self.protocol.parse_hello_response(data)
+            print(f"  [Client] Parse result: success={success}, new_port={new_port}")
             
             if not success:
+                print(f"  [Client] HELLO response indicates failure")
                 return False
             
             self.game_port = new_port
+            print(f"  [Client] Creating game socket for port {self.game_port}...")
             self.game_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.game_socket.settimeout(5.0)
+            print(f"  [Client] Game socket created")
             
+            print(f"  [Client] Performing handshake...")
             await self._perform_handshake(host)
+            print(f"  [Client] Handshake completed")
+            
             self.connected = True
             return True
             
         except Exception as e:
+            import traceback
+            print(f"  [Client] CONNECTION ERROR: {type(e).__name__}: {e}")
+            print(f"  [Client] Traceback:")
+            traceback.print_exc()
             if self.on_error:
                 self.on_error(str(e))
             return False
     
     async def _perform_handshake(self, host: str) -> None:
+        print(f"  [Client] Building login message...")
         login_msg = self.protocol.build_user_login(self.username, self.emulator, self.connection_type)
+        print(f"  [Client] Building packet...")
         packet = self.protocol.build_packet([login_msg])
+        print(f"  [Client] Sending login packet to {host}:{self.game_port}...")
         self.game_socket.sendto(packet, (host, self.game_port))
         
-        for _ in range(4):
+        print(f"  [Client] Starting 4-packet ACK exchange...")
+        for i in range(4):
+            print(f"  [Client] Round {i+1}/4 of ACK exchange...")
             await self._receive_and_ack(host)
+        print(f"  [Client] ACK exchange completed")
     
     async def _receive_and_ack(self, host: str) -> None:
-        data, _ = self.game_socket.recvfrom(4096)
+        print(f"  [Client] Waiting for data...")
+        data, addr = self.game_socket.recvfrom(4096)
+        print(f"  [Client] Received {len(data)} bytes from {addr}")
+        
+        print(f"  [Client] Parsing packet...")
         messages = self.protocol.parse_packet(data)
+        print(f"  [Client] Parsed {len(messages)} messages")
         
         for msg in messages:
+            print(f"  [Client] Message type: {msg.message_type} ({hex(msg.message_type)})")
             if msg.message_type == MessageType.SERVER_STATUS:
+                print(f"  [Client] Parsing server status...")
                 status = self.protocol.parse_server_status(msg.data)
+                print(f"  [Client] Status: {status.users} users, {status.games} games")
                 if self.on_status_update:
                     self.on_status_update(status)
         
+        print(f"  [Client] Building ACK message...")
         ack_msg = self.protocol.build_client_ack()
+        print(f"  [Client] Building ACK packet...")
         packet = self.protocol.build_packet([ack_msg])
+        print(f"  [Client] Sending ACK...")
         self.game_socket.sendto(packet, (host, self.game_port))
+        print(f"  [Client] ACK sent")
     
     async def update_status(self, host: str) -> Optional[ServerStatus]:
         if not self.connected:
