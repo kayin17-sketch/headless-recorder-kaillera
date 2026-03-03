@@ -20,8 +20,12 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
     instances: Dict[str, 'KailleraInstance'] = {}
     recorder = KailleraRecorder("../recordings")
     
+    def log_message(self, format, *args):
+        print(f"[{self.log_date_time_string()}] {format % args}")
+    
     def do_GET(self):
         parsed_path = urlparse(self.path)
+        self.log_message("GET %s", parsed_path.path)
         
         if parsed_path.path == '/' or parsed_path.path == '/index.html':
             self.serve_static_file('../frontend/templates/index.html', 'text/html')
@@ -42,7 +46,9 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
     
     def do_POST(self):
         parsed_path = urlparse(self.path)
-        content_length = int(self.headers['Content-Length'])
+        self.log_message("POST %s", parsed_path.path)
+        
+        content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length)
         
         try:
@@ -74,7 +80,10 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
     def serve_static_file(self, filepath: str, content_type: str):
         full_path = os.path.join(os.path.dirname(__file__), filepath)
         
+        self.log_message("Serving static file: %s (full: %s)", filepath, full_path)
+        
         if not os.path.exists(full_path):
+            self.log_message("File not found: %s", full_path)
             self.send_response(404)
             self.end_headers()
             return
@@ -84,7 +93,7 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         
         self.send_response(200)
         self.send_header('Content-Type', content_type)
-        self.send_header('Content-Length', len(content))
+        self.send_header('Content-Length', str(len(content)))
         self.end_headers()
         self.wfile.write(content)
     
@@ -157,23 +166,31 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         def run_connect():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            success = loop.run_until_complete(client.connect(host, port))
-            if success:
-                loop.run_until_complete(client.update_status(host))
-            loop.close()
-            
-            result = {
-                'success': success,
-                'connected': client.connected,
-                'game_port': client.game_port
-            }
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(result).encode())
+            try:
+                success = loop.run_until_complete(client.connect(host, port))
+                if success:
+                    loop.run_until_complete(client.update_status(host))
+            except Exception as e:
+                print(f"Connection error: {e}")
+                success = False
+            finally:
+                loop.close()
+                
+                result = {
+                    'success': success,
+                    'connected': client.connected,
+                    'game_port': client.game_port
+                }
+                
+                try:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(result).encode())
+                except:
+                    pass
         
-        thread = threading.Thread(target=run_connect)
+        thread = threading.Thread(target=run_connect, daemon=True)
         thread.start()
     
     def handle_disconnect(self, data: dict):
@@ -203,16 +220,24 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         def run_join():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            success = loop.run_until_complete(instance.client.join_game(instance.server['host'], game_id))
-            instance.current_game = game_id
-            loop.close()
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({'success': success}).encode())
+            try:
+                success = loop.run_until_complete(instance.client.join_game(instance.server['host'], game_id))
+                instance.current_game = game_id
+            except Exception as e:
+                print(f"Join game error: {e}")
+                success = False
+            finally:
+                loop.close()
+                
+                try:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'success': success}).encode())
+                except:
+                    pass
         
-        thread = threading.Thread(target=run_join)
+        thread = threading.Thread(target=run_join, daemon=True)
         thread.start()
     
     def handle_leave_game(self, data: dict):
@@ -242,16 +267,23 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         def run_start():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(instance.client.start_game(instance.server['host']))
-            loop.run_until_complete(instance.client.ready_to_play(instance.server['host']))
-            loop.close()
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
+            try:
+                loop.run_until_complete(instance.client.start_game(instance.server['host']))
+                loop.run_until_complete(instance.client.ready_to_play(instance.server['host']))
+            except Exception as e:
+                print(f"Start game error: {e}")
+            finally:
+                loop.close()
+                
+                try:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'success': True}).encode())
+                except:
+                    pass
         
-        thread = threading.Thread(target=run_start)
+        thread = threading.Thread(target=run_start, daemon=True)
         thread.start()
     
     def handle_start_recording(self, data: dict):
@@ -271,6 +303,7 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         )
         instance.recording = True
         instance.recording_id = recording_id
+        instance.recording_start_time = time.time()
         instance.recorder = KailleraRecorder()
         instance.recorder.start_recording(
             instance.server['host'],
