@@ -10,7 +10,8 @@ import asyncio
 from pathlib import Path
 
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
 from protocol.kaillera_client import KailleraClient
 from recorder.recorder import KailleraRecorder
@@ -18,7 +19,7 @@ from recorder.recorder import KailleraRecorder
 
 class KailleraAPIHandler(BaseHTTPRequestHandler):
     instances: Dict[str, 'KailleraInstance'] = {}
-    recorder = KailleraRecorder("../recordings")
+    recorder = KailleraRecorder(os.path.join(PROJECT_ROOT, "recordings"))
     
     def log_message(self, format, *args):
         print(f"[{self.log_date_time_string()}] {format % args}")
@@ -28,11 +29,11 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         self.log_message("GET %s", parsed_path.path)
         
         if parsed_path.path == '/' or parsed_path.path == '/index.html':
-            self.serve_static_file('../frontend/templates/index.html', 'text/html')
+            self.serve_static_file('frontend/templates/index.html', 'text/html')
         elif parsed_path.path == '/style.css':
-            self.serve_static_file('../frontend/static/style.css', 'text/css')
+            self.serve_static_file('frontend/static/style.css', 'text/css')
         elif parsed_path.path == '/app.js':
-            self.serve_static_file('../frontend/static/app.js', 'application/javascript')
+            self.serve_static_file('frontend/static/app.js', 'application/javascript')
         elif parsed_path.path == '/api/servers':
             self.handle_list_servers()
         elif parsed_path.path == '/api/instances':
@@ -78,9 +79,10 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'Not Found')
     
     def serve_static_file(self, filepath: str, content_type: str):
-        full_path = os.path.join(os.path.dirname(__file__), filepath)
+        full_path = os.path.join(PROJECT_ROOT, filepath)
+        full_path = os.path.normpath(full_path)
         
-        self.log_message("Serving static file: %s (full: %s)", filepath, full_path)
+        self.log_message("Serving: %s", full_path)
         
         if not os.path.exists(full_path):
             self.log_message("File not found: %s", full_path)
@@ -88,14 +90,19 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         
-        with open(full_path, 'rb') as f:
-            content = f.read()
-        
-        self.send_response(200)
-        self.send_header('Content-Type', content_type)
-        self.send_header('Content-Length', str(len(content)))
-        self.end_headers()
-        self.wfile.write(content)
+        try:
+            with open(full_path, 'rb') as f:
+                content = f.read()
+            
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception as e:
+            self.log_message("Error reading file: %s", e)
+            self.send_response(500)
+            self.end_headers()
     
     def handle_list_servers(self):
         self.send_response(200)
@@ -153,7 +160,7 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
             instance.update_status(status)
         
         def on_game_data(game_data):
-            if instance.recording:
+            if instance.recording and instance.recorder:
                 instance.recorder.add_frame(
                     len(instance.recorder.frame_data),
                     time.time(),
@@ -332,10 +339,11 @@ class KailleraAPIHandler(BaseHTTPRequestHandler):
         game_data = instance.client.stop_recording()
         duration = time.time() - instance.recording_start_time if hasattr(instance, 'recording_start_time') else 0
         
-        recording = instance.recorder.stop_recording(duration)
-        if recording:
-            json_file = self.recorder.save_recording(recording)
-            kr_file = self.recorder.save_kaillera_format(recording)
+        if instance.recorder:
+            recording = instance.recorder.stop_recording(duration)
+            if recording:
+                json_file = self.recorder.save_recording(recording)
+                kr_file = self.recorder.save_kaillera_format(recording)
         
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -376,6 +384,7 @@ class KailleraInstance:
 
 
 def run_server(host: str = '0.0.0.0', port: int = 8000):
+    print(f"PROJECT_ROOT: {PROJECT_ROOT}")
     server = HTTPServer((host, port), KailleraAPIHandler)
     print(f"Server running on http://{host}:{port}")
     server.serve_forever()
