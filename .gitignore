@@ -46,3 +46,7 @@ recordings/*.kr
 
 # Config
 config.local.yaml
+
+# Server configuration (local)
+backend/servers.json
+!backend/servers.json.example
