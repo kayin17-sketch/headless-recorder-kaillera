@@ -9,6 +9,8 @@ Un cliente headless lightweight para grabar partidas de Kaillera con una interfa
 - **Grabación de Partidas**: Guarda partidas en formato JSON y formato Kaillera nativo (.kr)
 - **Gestión de Servidores**: Configura múltiples servidores para monitorear
 - **Monitoreo en Tiempo Real**: Visualiza partidas activas y estado de conexión
+- **Multiplataforma**: Compatible con Linux, Windows y macOS
+- **Sin Dependencias**: Solo librerías estándar de Python
 
 ## Arquitectura
 
@@ -37,22 +39,49 @@ headless_recorder_kaillera/
 - Python 3.7 o superior
 - Servidor Kaillera (puedes usar [EmuLinker-K](https://github.com/hopskipnfall/EmuLinker-K) o [Direlera-rs](https://github.com/caromdreamer/direlera-rs))
 
+> **Nota para usuarios de Windows**: Consulta [WINDOWS.md](WINDOWS.md) para instrucciones específicas de instalación en Windows 10/11.
+
 ## Instalación
 
 1. Clona o descarga este repositorio:
 ```bash
+git clone https://github.com/kayin17-sketch/headless-recorder-kaillera.git
 cd headless_recorder_kaillera
 ```
 
 2. El proyecto usa solo librerías estándar de Python, no requiere instalación de dependencias.
 
+### Windows
+
+Para Windows, consulta la [Guía de Instalación para Windows](WINDOWS.md) que incluye:
+- Instrucciones paso a paso
+- Solución de problemas comunes
+- Configuración del firewall
+- Ejecución como servicio
+
+Resumen rápido:
+```cmd
+start.bat
+```
+
 ## Uso
 
 ### Iniciar el Servidor
 
+#### Linux/Mac:
 ```bash
+./start.sh
+# O directamente:
 cd backend
 python3 main.py
+```
+
+#### Windows:
+```cmd
+start.bat
+# O directamente:
+cd backend
+python main.py
 ```
 
 El servidor se iniciará en `http://localhost:8000`
